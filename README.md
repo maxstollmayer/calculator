@@ -16,12 +16,12 @@ Clone the repository using and change into the newly created directory. Using GH
 
 Expressions consist of the following building blocks.
 
-- Number  .......... integers and floats
-- Parentheses ...... (x)
-- Addition ......... x + y
-- Subtraction ...... x - y
-- Multiplication ... x * y
-- Division ......... x / y
+- Integers and floats
+- Parentheses (x)
+- Addition x + y
+- Subtraction x - y
+- Multiplication x * y
+- Division x / y
 
 ### REPL Mode
 

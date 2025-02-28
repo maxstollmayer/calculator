@@ -6,7 +6,7 @@ Written as an exercise to implement a recursive descent parser combinator in Has
 
 ## Usage
 
-Clone the repository using and change into the newly created directory. Using GHC 9.4.8 or later compile with `ghc -isrc --make src/Main.hs -o calculate`. Now run `./calculate [OPTION] [EXPRESSION...]` with.
+Clone the repository using and change into the newly created directory. Using GHC 9.4.8 or later compile with `ghc -isrc --make src/Main.hs -o calculate`. Now run `./calculate [OPTION] [EXPRESSION...]`.
 
 ### Options
 

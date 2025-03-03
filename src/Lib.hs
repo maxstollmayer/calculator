@@ -4,35 +4,97 @@ import Control.Applicative (Alternative (empty, many, some, (<|>)), optional)
 import Data.Char (isDigit, isSpace)
 import Data.Functor (void, ($>), (<$))
 
-data Term
+data Expr
   = Num Double
-  | Add Term Term
-  | Sub Term Term
-  | Mul Term Term
-  | Div Term Term
+  | Sqrt Expr
+  | Log Expr
+  | Sin Expr
+  | Cos Expr
+  | Tan Expr
+  | Asin Expr
+  | Acos Expr
+  | Atan Expr
+  | Sinh Expr
+  | Cosh Expr
+  | Tanh Expr
+  | Asinh Expr
+  | Acosh Expr
+  | Atanh Expr
+  | Add Expr Expr
+  | Sub Expr Expr
+  | Mul Expr Expr
+  | Div Expr Expr
+  | Exp Expr Expr
   deriving (Show)
 
 -- TODO: use minimal parentheses
-pprint :: Term -> String
+pprint :: Expr -> String
 pprint (Num num) = show num
+pprint (Sqrt x) = pprintUnOp "sqrt" x
+pprint (Log x) = pprintUnOp "log" x
+pprint (Sin x) = pprintUnOp "sin" x
+pprint (Cos x) = pprintUnOp "cos" x
+pprint (Tan x) = pprintUnOp "tan" x
+pprint (Asin x) = pprintUnOp "asin" x
+pprint (Acos x) = pprintUnOp "acos" x
+pprint (Atan x) = pprintUnOp "atan" x
+pprint (Sinh x) = pprintUnOp "sinh" x
+pprint (Cosh x) = pprintUnOp "cosh" x
+pprint (Tanh x) = pprintUnOp "tanh" x
+pprint (Asinh x) = pprintUnOp "asinh" x
+pprint (Acosh x) = pprintUnOp "acosh" x
+pprint (Atanh x) = pprintUnOp "atanh" x
 pprint (Add x y) = pprintBinOp "+" x y
 pprint (Sub x y) = pprintBinOp "-" x y
 pprint (Mul x y) = pprintBinOp "*" x y
 pprint (Div x y) = pprintBinOp "/" x y
+pprint (Exp x y) = pprintBinOp "^" x y
 
-pprintBinOp :: String -> Term -> Term -> String
-pprintBinOp op a b = "(" ++ pprint a ++ " " ++ op ++ " " ++ pprint b ++ ")"
+pprintUnOp :: String -> Expr -> String
+pprintUnOp op x = op ++ "(" ++ pprint x ++ ")"
 
-eval :: Term -> Either String Double
+pprintBinOp :: String -> Expr -> Expr -> String
+pprintBinOp op x y = "(" ++ pprint x ++ " " ++ op ++ " " ++ pprint y ++ ")"
+
+eval :: Expr -> Either String Double
 eval (Num num) = Right num
+eval (Sqrt x) = evalSafe "Square root of negative number." sqrt x
+eval (Log x) = evalSafe "Logarithm of non-positive number." log x
+eval (Sin x) = sin <$> eval x
+eval (Cos x) = cos <$> eval x
+eval (Tan x) = tan <$> eval x -- does not return NaN because of float errors
+eval (Asin x) = evalSafe "Inverse sine of number outside [-1,1]." asin x
+eval (Acos x) = evalSafe "Inverse cosine of number outside [-1,1]." acos x
+eval (Atan x) = atan <$> eval x
+eval (Sinh x) = sinh <$> eval x
+eval (Cosh x) = cosh <$> eval x
+eval (Tanh x) = tanh <$> eval x
+eval (Asinh x) = asinh <$> eval x
+eval (Acosh x) = evalSafe "Inverse hyperbolic cosine of negative number." acosh x
+eval (Atanh x) = evalSafe "Inverse hyperbolic tangent of number outside (-1,1)." atanh x
 eval (Add x y) = (+) <$> eval x <*> eval y
 eval (Sub x y) = (-) <$> eval x <*> eval y
 eval (Mul x y) = (*) <$> eval x <*> eval y
 eval (Div x y) = do
-  denominator <- eval y
-  if denominator == 0
+  val <- eval y
+  if val == 0
     then Left "Division by zero."
-    else (/ denominator) <$> eval x
+    else (/ val) <$> eval x
+eval (Exp x y) = do
+  valx <- eval x
+  valy <- eval y
+  let res = valx ** valy
+  if isNaN res
+    then Left "Exponentiation of negative base."
+    else Right res
+
+evalSafe :: String -> (Double -> Double) -> Expr -> Either String Double
+evalSafe msg f x = do
+  val <- eval x
+  let res = f val
+  if isNaN res || isInfinite res
+    then Left msg
+    else Right res
 
 -- Parser Interface
 
@@ -120,12 +182,12 @@ digit = satisfy isDigit
 lexeme :: Parser a -> Parser a
 lexeme p = whitespace *> p <* whitespace
 
-symbol :: Char -> Parser ()
-symbol = void . lexeme . char
+symbol :: String -> Parser ()
+symbol = void . lexeme . string
 
--- Term Parsers
+-- Expr Parsers
 
-number :: Parser Term
+number :: Parser Expr
 number = Num . read <$> lexeme num
   where
     num = do
@@ -134,22 +196,47 @@ number = Num . read <$> lexeme num
       dec <- (char '.' *> some digit) <|> pure "0"
       return $ sign ++ int ++ "." ++ dec
 
-parens :: Parser Term
-parens = symbol '(' *> term <* symbol ')'
+parens :: Parser Expr
+parens = symbol "(" *> term <* symbol ")"
 
-atom :: Parser Term
-atom = number <|> parens
+unary :: (Expr -> Expr) -> String -> Parser Expr
+unary op sym = op <$> (symbol sym *> term)
 
-mulDiv :: Parser Term
-mulDiv = chainLeft atom ((Mul <$ symbol '*') <|> (Div <$ symbol '/'))
+atom :: Parser Expr
+atom =
+  number
+    <|> unary Sqrt "sqrt"
+    <|> unary Log "log"
+    <|> unary Sin "sin"
+    <|> unary Cos "cos"
+    <|> unary Tan "tan"
+    <|> unary Asin "asin"
+    <|> unary Acos "acos"
+    <|> unary Atan "atan"
+    <|> unary Sinh "sinh"
+    <|> unary Cosh "cosh"
+    <|> unary Tanh "tanh"
+    <|> unary Asinh "asinh"
+    <|> unary Acosh "acosh"
+    <|> unary Atanh "atanh"
+    <|> parens
 
-addSub :: Parser Term
-addSub = chainLeft mulDiv ((Add <$ symbol '+') <|> (Sub <$ symbol '-'))
+expP :: Parser Expr
+expP = chainRight atom (Exp <$ symbol "**")
 
-term :: Parser Term
-term = lexeme addSub <* eof
+mulDiv :: Parser Expr
+mulDiv = chainLeft expP ((Mul <$ symbol "*") <|> (Div <$ symbol "/"))
 
-parse :: String -> Maybe Term
+addSub :: Parser Expr
+addSub = chainLeft mulDiv ((Add <$ symbol "+") <|> (Sub <$ symbol "-"))
+
+term :: Parser Expr
+term = lexeme addSub
+
+expr :: Parser Expr
+expr = term <* eof
+
+parse :: String -> Maybe Expr
 parse input = do
   (_, t) <- runParser term input
   return t
